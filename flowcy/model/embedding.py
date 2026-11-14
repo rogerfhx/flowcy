@@ -14,7 +14,7 @@ class token_embedding(nn.Module):
     """
     embed each token into d_model dimension vector
     """
-    def __init__(self, tokens: torch.tensor, num_vocabs: int, d_model: int):
+    def __init__(self, tokens:torch.tensor, num_vocabs:int, d_model:int):
         super().__init__()
         self.tokens = tokens
         self.d_model = d_model
@@ -31,14 +31,14 @@ class segment_embedding():
     return zero tensor if unconditional generation
 
     """
-    def __init__(self, tokens, d_model, is_conditional: bool):
+    def __init__(self, tokens:torch.tensor, d_model:int, is_conditional:bool):
         self.tokens = tokens
         self.num_token = len(tokens)
         self.d_model = d_model
         self.is_conditional = is_conditional
         self.segment_embedding = nn.Embedding(2, self.d_model) 
 
-    def embed(self):
+    def embed(self) -> torch.tensor:
         if self.is_conditonal:
             return self.segment_embedding(self.tokens)
         else:
@@ -54,7 +54,7 @@ class rotary_position_embedding():
         self.d_model = d_model
 
 
-    def _get_frequencies(self):
+    def _get_frequencies(self) -> torch.tensor:
         """
         i in {1, 2, ..., d/2}
         """
@@ -66,7 +66,7 @@ class rotary_position_embedding():
         return frequencies
 
 
-    def rotate(self, matrix:torch.tensor, d_model: int):
+    def rotate(self, matrix:torch.tensor, d_model:int) -> torch.tensor:
         """
         rotate the query and key vector using element wise multiplication
         rotation matrix = [mθ_1, ..., mθ_{d/2}]
@@ -87,4 +87,44 @@ class rotary_position_embedding():
         return rotated_matrix
 
 
+
 class time_embedding():
+    """
+    sinusoidal time embedding + MLP to project time into d_model vector
+    """
+
+    def __init__(self, t:float, d_model:int, d_time:int):
+        self.time = t
+        self.d_model = d_model
+        self.d_time = d_time 
+
+        self.mlp = nn.Sequential(nn.Linear(d_model, d_time), nn.ReLU(), 
+                                 nn.Linear(d_time, d_time), nn.ReLU(),
+                                 nn.Linear(d_time, d_model), nn.ReLU(), 
+                                 nn.LayerNorm())
+
+
+    def _get_angular_frequencies(self) -> torch.tensor:
+        half_d_model = self.d_model // 2
+        half_d_model_index = torch.arange(half_d_model)
+        angular_frequncies = 1 / (1e4 ** (2 * half_d_model_index / self.d_model))
+
+        return angular_frequncies
+
+
+    def _embed_time(self) -> torch.tenor:
+        angular_frequencies = self._get_angular_frequencies()
+        sin_embed = torch.cos(angular_frequencies * self.time[0::2])
+        cos_embed = torch.sin(angular_frequencies * self.time[1::2])
+
+        sinusoidal_embedding = torch.cat((sin_embed, cos_embed), dim=1).flatten()
+
+        return sinusoidal_embedding
+
+
+    def embed(self) -> torch.tensor:
+        """
+        project the sinsusodial embedding into high dimensional vector via MLP
+        """
+        embeded_time = self._embed_time(self.time)
+        return self.mlp(embeded_time)
