@@ -12,7 +12,7 @@ class multi_head_attention():
     """
     multi head attention with rotary positional embedding
     """
-    def __init__(self, input, num_head, d_model):
+    def __init__(self, input:torch.tensor, num_head:int, d_model:int):
         self.input = input
         self.num_head = num_head
         self.num_tokens = input.shape[0]
@@ -25,7 +25,7 @@ class multi_head_attention():
         self.rope = rotary_position_embedding(self.query, self.key)
 
 
-    def forward(self):
+    def forward(self) -> torch.tensor:
         layer_norm = nn.LayerNorm(self.d_model)
         layer_norm(self.input)
         multi_context_input = torch.empty((self.num_head, self.num_tokens, self.d_model))
@@ -46,14 +46,13 @@ class feed_forward():
                                 nn.Linear(d_model, self.d_ffn), nn.GELU(),
                                 nn.Linear(self.d_ffn, d_model))
 
-    def forward(self, input:torch.tensor):
+    def forward(self, input:torch.tensor) -> torch.tensor:
         return self.nn(input)
 
 
 
 class transformer_block():
-    def __init__(self, input:torch.tensor, d_model:int, num_head:int):
-        self.input = input
+    def __init__(self, d_model:int, num_head:int):
         self.d_model = d_model
         self.num_head = num_head
 
@@ -61,23 +60,22 @@ class transformer_block():
         self.ffn = feed_forward(d_model)
 
 
-    def forward(self):
-       attended_input = self.multi_head_attention.forward() + self.input
+    def forward(self, input:torch.tensor) -> torch.tensor:
+       attended_input = self.multi_head_attention.forward() + input
        output = self.ffn.forward(attended_input) + attended_input
        return output
 
 
 
 class transformer_stack():
-    def __init__(self, input, num_layer:int, d_model:int, num_head:int):
-        self.input = input
+    def __init__(self, num_layer:int, d_model:int, num_head:int):
         self.num_layer = num_layer
         self.d_model = d_model
         self.num_head = num_head
 
-        self.transformer_block = nn.Sequential(*(transformer_block(input, d_model, num_head) 
+        self.transformer_block = nn.Sequential(*(transformer_block(d_model, num_head) 
                                              for _ in range(num_layer)))
 
-    def forward(self):
-        return self.transformer_block(self.input)
+    def forward(self, input:torch.tensor) -> torch.tensor:
+        return self.transformer_block(input)
         
